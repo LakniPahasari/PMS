@@ -1,3 +1,9 @@
-# Hello World Project
+# PMS
 
-A simple HTML project that displays Hello World.
+Prescription Management System
+
+This repository currently contains a simple HTML Hello World example:
+
+- `Test.html` displays "Hello World" in the browser.
+
+Future project files can be added here as the PMS application grows.
