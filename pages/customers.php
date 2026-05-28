@@ -11,13 +11,21 @@ $customers = $db->query("
     ORDER BY customer_id DESC
 ")->fetchAll();
 
+// Calculate age from DOB
+function calcAge(?string $dob): ?int {
+    if (!$dob) return null;
+    return (int)(new DateTime())->diff(new DateTime($dob))->y;
+}
+
 $pageTitle = 'Customers';
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
-<!-- Page toolbar -->
-<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
-    <span style="color:var(--text-muted); font-size:13px;">
+<!-- Toolbar -->
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap;">
+    <input type="text" id="customerSearch" class="form-control"
+           placeholder="Search by name or ID..." style="max-width:280px;">
+    <span style="color:var(--text-muted); font-size:13px; flex:1;">
         <?= count($customers) ?> customer<?= count($customers) !== 1 ? 's' : '' ?> total
     </span>
     <button class="btn btn-primary" id="openAddCustomer">+ Add New Customer</button>
@@ -28,24 +36,28 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="card-body">
         <?php if ($customers): ?>
         <div class="table-wrap">
-            <table>
+            <table id="customersTable">
                 <thead>
                     <tr>
                         <th>ID</th>
                         <th>Name</th>
-                        <th>Email</th>
                         <th>Date of Birth</th>
+                        <th>Age</th>
+                        <th>Email</th>
                         <th>Status</th>
-                        <th style="width:60px; text-align:center;">Edit</th>
+                        <th style="width:100px; text-align:center;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($customers as $c): ?>
+                    <?php foreach ($customers as $c):
+                        $age = calcAge($c['date_of_birth']);
+                    ?>
                     <tr>
                         <td>#<?= $c['customer_id'] ?></td>
                         <td><?= htmlspecialchars($c['name']) ?></td>
-                        <td><?= $c['email'] ? htmlspecialchars($c['email']) : '<span style="color:var(--text-muted)">—</span>' ?></td>
                         <td><?= $c['date_of_birth'] ? date('d M Y', strtotime($c['date_of_birth'])) : '<span style="color:var(--text-muted)">—</span>' ?></td>
+                        <td><?= $age !== null ? $age . ' yrs' : '<span style="color:var(--text-muted)">—</span>' ?></td>
+                        <td><?= $c['email'] ? htmlspecialchars($c['email']) : '<span style="color:var(--text-muted)">—</span>' ?></td>
                         <td>
                             <?php if ($c['account_active']): ?>
                                 <span class="badge" style="background:#d1fae5;color:#065f46;">Active</span>
@@ -53,7 +65,9 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span class="badge" style="background:#f3f4f6;color:#6b7280;">Inactive</span>
                             <?php endif; ?>
                         </td>
-                        <td style="text-align:center;">
+                        <td style="text-align:center; display:flex; gap:6px; justify-content:center;">
+                            <a href="/pages/customer_profile.php?id=<?= $c['customer_id'] ?>"
+                               class="btn-icon" title="View profile">👁</a>
                             <button class="btn-icon edit-btn"
                                 title="Edit customer"
                                 data-id="<?= $c['customer_id'] ?>"
@@ -71,6 +85,9 @@ require_once __DIR__ . '/../includes/header.php';
                     <?php endforeach; ?>
                 </tbody>
             </table>
+        </div>
+        <div id="noResultsMsg" style="display:none;" class="empty-state">
+            No customers match your search.
         </div>
         <?php else: ?>
             <div class="empty-state">No customers yet. Add your first customer using the button above.</div>
@@ -100,16 +117,16 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label class="form-label">Date of Birth</label>
-                    <input type="date" name="date_of_birth" class="form-control">
+                    <label class="form-label">Date of Birth <span class="required">*</span></label>
+                    <input type="date" name="date_of_birth" class="form-control" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Address</label>
-                    <input type="text" name="address" class="form-control" placeholder="Residential address">
+                    <label class="form-label">Address <span class="required">*</span></label>
+                    <input type="text" name="address" class="form-control" placeholder="Residential address" required>
                 </div>
             </div>
             <div class="form-group">
-                <label class="form-label">Medical History</label>
+                <label class="form-label">Medical History / Conditions</label>
                 <textarea name="medical_history" class="form-control" rows="3"
                     placeholder="Known conditions, diagnoses, chronic illnesses..."></textarea>
             </div>
@@ -149,35 +166,30 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label class="form-label">Date of Birth</label>
-                    <input type="date" name="date_of_birth" id="edit_dob" class="form-control">
+                    <label class="form-label">Date of Birth <span class="required">*</span></label>
+                    <input type="date" name="date_of_birth" id="edit_dob" class="form-control" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Address</label>
-                    <input type="text" name="address" id="edit_address" class="form-control">
+                    <label class="form-label">Address <span class="required">*</span></label>
+                    <input type="text" name="address" id="edit_address" class="form-control" required>
                 </div>
             </div>
             <div class="form-group">
-                <label class="form-label">Medical History</label>
+                <label class="form-label">Medical History / Conditions</label>
                 <textarea name="medical_history" id="edit_history" class="form-control" rows="3"></textarea>
             </div>
             <div class="form-group">
                 <label class="form-label">Known Allergies</label>
                 <textarea name="allergies" id="edit_allergies" class="form-control" rows="2"></textarea>
             </div>
-
-            <!-- Active / Inactive toggle -->
             <div class="form-group">
                 <label class="form-label">Account Status</label>
                 <label class="toggle-switch">
                     <input type="checkbox" name="account_active" id="edit_active">
-                    <span class="toggle-track">
-                        <span class="toggle-thumb"></span>
-                    </span>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
                     <span class="toggle-label" id="toggleLabel">Active</span>
                 </label>
             </div>
-
         </div>
         <div class="modal-footer">
             <button type="button" class="btn" data-close="edit" style="background:var(--border);color:var(--text);">Cancel</button>
@@ -187,6 +199,21 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+// ── Search / filter ──────────────────────────────────────
+document.getElementById('customerSearch').addEventListener('input', function () {
+    const q    = this.value.toLowerCase().trim();
+    const rows = document.querySelectorAll('#customersTable tbody tr');
+    let visible = 0;
+    rows.forEach(row => {
+        const id   = row.cells[0].textContent.toLowerCase();
+        const name = row.cells[1].textContent.toLowerCase();
+        const show = !q || id.includes(q) || name.includes(q);
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    document.getElementById('noResultsMsg').style.display = visible === 0 ? 'block' : 'none';
+});
+
 // ── Modal helpers ────────────────────────────────────────
 function openModal(id) {
     document.getElementById(id + 'CustomerModal').classList.add('open');
@@ -205,7 +232,6 @@ function showToast(id, message, type) {
     t.className   = 'toast show toast-' + type;
 }
 
-// Open/close triggers
 document.getElementById('openAddCustomer').addEventListener('click', () => openModal('add'));
 document.querySelectorAll('[data-close]').forEach(btn =>
     btn.addEventListener('click', () => closeModal(btn.dataset.close))
@@ -225,15 +251,13 @@ document.querySelectorAll('.edit-btn').forEach(btn => {
         document.getElementById('edit_allergies').value   = btn.dataset.allergies;
 
         const isActive = btn.dataset.active === '1';
-        const toggle   = document.getElementById('edit_active');
-        toggle.checked = isActive;
+        document.getElementById('edit_active').checked   = isActive;
         document.getElementById('toggleLabel').textContent = isActive ? 'Active' : 'Inactive';
 
         openModal('edit');
     });
 });
 
-// Live toggle label update
 document.getElementById('edit_active').addEventListener('change', function () {
     document.getElementById('toggleLabel').textContent = this.checked ? 'Active' : 'Inactive';
 });
@@ -244,12 +268,10 @@ async function submitForm(formId, action, toastId, submitBtnText) {
     const btn  = form.querySelector('[type="submit"]');
     btn.disabled    = true;
     btn.textContent = 'Saving...';
-
     try {
         const res  = await fetch(action, { method: 'POST', body: new FormData(form) });
         const data = await res.json();
         const id   = toastId.replace('Toast', '');
-
         if (data.success) {
             showToast(id, data.message, 'success');
             setTimeout(() => { closeModal(id); location.reload(); }, 1500);

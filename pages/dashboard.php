@@ -14,10 +14,14 @@ $customers = $db->query("SELECT COUNT(*) FROM CUSTOMER WHERE account_active = 1"
 
 // ── Recent prescriptions ──────────────────────────────────
 $recentPrescriptions = $db->query("
-    SELECT p.prescription_id, c.name AS customer, m.medication_name, p.status, p.created_at
+    SELECT p.prescription_id, c.name AS customer,
+           GROUP_CONCAT(m.medication_name ORDER BY m.medication_name SEPARATOR ', ') AS medication_name,
+           p.status, p.created_at
     FROM PRESCRIPTION p
-    JOIN CUSTOMER c       ON c.customer_id = p.customer_id
-    JOIN MEDICINE_STOCK m ON m.stock_id    = p.stock_id
+    JOIN CUSTOMER c           ON c.customer_id      = p.customer_id
+    JOIN PRESCRIPTION_ITEM pi ON pi.prescription_id = p.prescription_id
+    JOIN MEDICINE_STOCK m     ON m.stock_id          = pi.stock_id
+    GROUP BY p.prescription_id
     ORDER BY p.created_at DESC
     LIMIT 5
 ")->fetchAll();

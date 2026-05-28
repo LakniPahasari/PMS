@@ -5,33 +5,17 @@ $role = $user['role'];
 // Current page for active link highlighting
 $current = basename($_SERVER['PHP_SELF']);
 
-$nav = [
-    'all' => [
-        ['href' => '/pages/dashboard.php',    'icon' => '🏠', 'label' => 'Dashboard'],
-    ],
-    'admin' => [
-        ['href' => '/pages/customers.php',    'icon' => '👤', 'label' => 'Customers'],
-        ['href' => '/pages/prescriptions.php','icon' => '📋', 'label' => 'Prescriptions'],
-        ['href' => '/pages/stock.php',        'icon' => '💊', 'label' => 'Medicine Stock'],
-        ['href' => '/pages/payments.php',     'icon' => '💳', 'label' => 'Payments'],
-        ['href' => '/pages/users.php',        'icon' => '👥', 'label' => 'System Users'],
-        ['href' => '/pages/audit.php',        'icon' => '📁', 'label' => 'Audit Log'],
-        ['href' => '/pages/alerts.php',       'icon' => '🔔', 'label' => 'Alerts'],
-    ],
-    'pharmacist' => [
-        ['href' => '/pages/customers.php',    'icon' => '👤', 'label' => 'Customers'],
-        ['href' => '/pages/prescriptions.php','icon' => '📋', 'label' => 'Prescriptions'],
-        ['href' => '/pages/stock.php',        'icon' => '💊', 'label' => 'Medicine Stock'],
-        ['href' => '/pages/alerts.php',       'icon' => '🔔', 'label' => 'Alerts'],
-    ],
-    'store_manager' => [
-        ['href' => '/pages/stock.php',        'icon' => '💊', 'label' => 'Medicine Stock'],
-        ['href' => '/pages/payments.php',     'icon' => '💳', 'label' => 'Payments'],
-        ['href' => '/pages/alerts.php',       'icon' => '🔔', 'label' => 'Alerts'],
-    ],
+// All roles see the full nav (role segregation will be added later)
+$links = [
+    ['href' => '/pages/dashboard.php',    'icon' => '🏠', 'label' => 'Dashboard'],
+    ['href' => '/pages/customers.php',    'icon' => '👤', 'label' => 'Customers'],
+    ['href' => '/pages/prescriptions.php','icon' => '📋', 'label' => 'Prescriptions'],
+    ['href' => '/pages/stock.php',        'icon' => '💊', 'label' => 'Medicine Stock'],
+    ['href' => '/pages/payments.php',     'icon' => '💳', 'label' => 'Payments'],
+    ['href' => '/pages/users.php',        'icon' => '👥', 'label' => 'System Users'],
+    ['href' => '/pages/audit.php',        'icon' => '📁', 'label' => 'Audit Log'],
+    ['href' => '/pages/alerts.php',       'icon' => '🔔', 'label' => 'Alerts'],
 ];
-
-$links = array_merge($nav['all'], $nav[$role] ?? []);
 ?>
 
 <aside class="sidebar" id="sidebar">
