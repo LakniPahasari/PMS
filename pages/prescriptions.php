@@ -67,9 +67,111 @@ $medicines = $db->query("
     FROM MEDICINE_STOCK WHERE is_active = 1 ORDER BY medication_name
 ")->fetchAll();
 
+// Pending prescription image requests from customer portal
+$pendingRequests = $db->query("
+    SELECT pr.request_id, pr.image_path, pr.notes, pr.status, pr.created_at,
+           c.customer_id, c.name AS customer_name
+    FROM PRESCRIPTION_REQUEST pr
+    JOIN CUSTOMER c ON c.customer_id = pr.customer_id
+    WHERE pr.status = 'pending'
+    ORDER BY pr.created_at ASC
+")->fetchAll();
+
 $pageTitle = 'Prescriptions';
 require_once __DIR__ . '/../includes/header.php';
 ?>
+
+<?php if ($pendingRequests): ?>
+<!-- Prescription image requests from customer portal -->
+<div data-panel="rx-requests"
+     style="background:#fff;border:1px solid #f59e0b;border-radius:10px;
+            box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:24px;overflow:hidden;">
+    <div style="background:#fef3c7;padding:12px 20px;display:flex;align-items:center;
+                justify-content:space-between;gap:12px;border-bottom:1px solid #f59e0b;">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">📥</span>
+            <strong style="color:#92400e;font-size:14px;">
+                <?= count($pendingRequests) ?> Pending Prescription Request<?= count($pendingRequests) > 1 ? 's' : '' ?> from Patient Portal
+            </strong>
+        </div>
+        <span style="font-size:12px;color:#92400e;">Review each request and create the prescription</span>
+    </div>
+
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px;">
+        <?php foreach ($pendingRequests as $req):
+            $ext = strtolower(pathinfo($req['image_path'], PATHINFO_EXTENSION));
+            $isPdf = $ext === 'pdf';
+        ?>
+        <div class="rx-request-card" data-id="<?= $req['request_id'] ?>"
+             style="display:flex;align-items:flex-start;gap:16px;padding:14px;
+                    border:1px solid #e2e8f0;border-radius:8px;background:#fafafa;">
+
+            <!-- Thumbnail / PDF icon -->
+            <div style="flex-shrink:0;">
+                <?php if ($isPdf): ?>
+                    <a href="/uploads/prescriptions/<?= htmlspecialchars($req['image_path']) ?>"
+                       target="_blank"
+                       style="display:flex;align-items:center;justify-content:center;
+                              width:72px;height:72px;background:#eff6ff;border-radius:8px;
+                              border:1px solid #bfdbfe;font-size:28px;text-decoration:none;">
+                        📄
+                    </a>
+                <?php else: ?>
+                    <a href="/uploads/prescriptions/<?= htmlspecialchars($req['image_path']) ?>"
+                       target="_blank">
+                        <img src="/uploads/prescriptions/<?= htmlspecialchars($req['image_path']) ?>"
+                             style="width:72px;height:72px;object-fit:cover;
+                                    border-radius:8px;border:1px solid #e2e8f0;cursor:zoom-in;">
+                    </a>
+                <?php endif; ?>
+            </div>
+
+            <!-- Info -->
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;font-size:14px;margin-bottom:2px;">
+                    <?= htmlspecialchars($req['customer_name']) ?>
+                </div>
+                <div style="font-size:12px;color:#64748b;margin-bottom:6px;">
+                    Submitted <?= date('d M Y H:i', strtotime($req['created_at'])) ?>
+                    &bull; Request #<?= $req['request_id'] ?>
+                </div>
+                <?php if ($req['notes']): ?>
+                    <div style="font-size:13px;color:#1e293b;background:#f1f5f9;
+                                padding:6px 10px;border-radius:6px;margin-bottom:8px;">
+                        💬 <?= htmlspecialchars($req['notes']) ?>
+                    </div>
+                <?php endif; ?>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <a href="/uploads/prescriptions/<?= htmlspecialchars($req['image_path']) ?>"
+                       target="_blank"
+                       style="padding:6px 12px;background:#eff6ff;color:#1e40af;
+                              border-radius:6px;font-size:12.5px;font-weight:600;
+                              text-decoration:none;border:1px solid #bfdbfe;">
+                        🔍 View <?= $isPdf ? 'PDF' : 'Image' ?>
+                    </a>
+                    <button class="btn-create-rx"
+                            data-customer-id="<?= $req['customer_id'] ?>"
+                            data-customer-name="<?= htmlspecialchars($req['customer_name'], ENT_QUOTES) ?>"
+                            data-request-id="<?= $req['request_id'] ?>"
+                            style="padding:6px 12px;background:#2563eb;color:#fff;
+                                   border:none;border-radius:6px;font-size:12.5px;
+                                   font-weight:600;cursor:pointer;">
+                        ✏️ Create Prescription
+                    </button>
+                    <button class="btn-mark-reviewed"
+                            data-id="<?= $req['request_id'] ?>"
+                            style="padding:6px 12px;background:#fff;color:#64748b;
+                                   border:1px solid #e2e8f0;border-radius:6px;
+                                   font-size:12.5px;font-weight:600;cursor:pointer;">
+                        ✓ Mark Reviewed
+                    </button>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Stat cards -->
 <div class="stats-grid">
@@ -761,12 +863,53 @@ document.getElementById('addPrescriptionForm').addEventListener('submit', async 
         if (data.success) {
             showToast('add', data.message, 'success');
             const footer = document.querySelector('#addPrescriptionModal .modal-footer');
-            footer.innerHTML = `
-                <button type="button" class="btn" onclick="closeModal('add');location.reload();"
-                    style="background:var(--border);color:var(--text);">Close</button>
-                <a href="/pages/payment_form.php?rx=${data.prescription_id}"
-                    class="btn btn-primary">Proceed to Payment &rarr;</a>
-            `;
+            const rxId   = data.prescription_id;
+            const violations = data.rule_violations || [];
+
+            if (violations.length > 0) {
+                // ── Rule violations detected — require acknowledgement ──
+                const items = violations.map(v => {
+                    const isCritical = v.startsWith('[CRITICAL]');
+                    const colour = isCritical ? '#991b1b' : '#92400e';
+                    const bg     = isCritical ? '#fee2e2' : '#fef3c7';
+                    const border = isCritical ? '#ef4444' : '#f59e0b';
+                    return `<div style="background:${bg};border-left:4px solid ${border};border-radius:4px;
+                                        padding:9px 12px;margin-bottom:6px;font-size:13px;color:${colour};">
+                                ${v.replace('[CRITICAL]','🚨').replace('[WARNING]','⚠️')}
+                            </div>`;
+                }).join('');
+
+                footer.innerHTML = `
+                    <div style="width:100%;">
+                        <div style="font-weight:700;color:#991b1b;margin-bottom:8px;font-size:13.5px;">
+                            ⚠️ Rule Violation${violations.length > 1 ? 's' : ''} Detected
+                        </div>
+                        ${items}
+                        <div style="font-size:12px;color:var(--text-muted);margin:10px 0 14px;">
+                            These violations have been logged to the Alerts page.
+                            You must acknowledge before proceeding.
+                        </div>
+                        <div style="display:flex;gap:10px;">
+                            <button type="button" class="btn"
+                                onclick="closeModal('add');location.reload();"
+                                style="background:var(--border);color:var(--text);">
+                                Close
+                            </button>
+                            <a href="/pages/payment_form.php?rx=${rxId}"
+                               class="btn btn-primary" style="flex:1;text-align:center;">
+                                I Acknowledge &amp; Proceed to Payment &rarr;
+                            </a>
+                        </div>
+                    </div>`;
+            } else {
+                // ── No violations — normal proceed ──
+                footer.innerHTML = `
+                    <button type="button" class="btn"
+                        onclick="closeModal('add');location.reload();"
+                        style="background:var(--border);color:var(--text);">Close</button>
+                    <a href="/pages/payment_form.php?rx=${rxId}"
+                       class="btn btn-primary">Proceed to Payment &rarr;</a>`;
+            }
         } else {
             showToast('add', data.message, 'error');
             btn.disabled = false; btn.textContent = 'Save Prescription';
@@ -776,7 +919,139 @@ document.getElementById('addPrescriptionForm').addEventListener('submit', async 
         btn.disabled = false; btn.textContent = 'Save Prescription';
     }
 });
-document.getElementById('editPrescriptionForm').addEventListener('submit', e => { e.preventDefault(); submitForm('editPrescriptionForm', '/actions/edit_prescription.php', 'edit', 'Save Changes'); });
+document.getElementById('editPrescriptionForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const form = document.getElementById('editPrescriptionForm');
+    const btn  = form.querySelector('[type="submit"]');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+        const res  = await fetch('/actions/edit_prescription.php', { method: 'POST', body: new FormData(form) });
+        const data = await res.json();
+        if (data.success) {
+            const violations = data.rule_violations || [];
+            if (violations.length > 0) {
+                // Show violations in modal — pharmacist must acknowledge
+                showToast('edit', data.message, 'success');
+                const footer = document.querySelector('#editPrescriptionModal .modal-footer');
+                const rxId   = data.prescription_id;
+                const items  = violations.map(v => {
+                    const isCritical = v.startsWith('[CRITICAL]');
+                    const colour = isCritical ? '#991b1b' : '#92400e';
+                    const bg     = isCritical ? '#fee2e2' : '#fef3c7';
+                    const border = isCritical ? '#ef4444' : '#f59e0b';
+                    return `<div style="background:${bg};border-left:4px solid ${border};border-radius:4px;
+                                        padding:9px 12px;margin-bottom:6px;font-size:13px;color:${colour};">
+                                ${v.replace('[CRITICAL]','🚨').replace('[WARNING]','⚠️')}
+                            </div>`;
+                }).join('');
+
+                footer.innerHTML = `
+                    <div style="width:100%;">
+                        <div style="font-weight:700;color:#991b1b;margin-bottom:8px;font-size:13.5px;">
+                            ⚠️ Rule Violation${violations.length > 1 ? 's' : ''} Detected
+                        </div>
+                        ${items}
+                        <div style="font-size:12px;color:var(--text-muted);margin:10px 0 14px;">
+                            These violations have been logged to the Alerts page.
+                            You must acknowledge before proceeding.
+                        </div>
+                        <div style="display:flex;gap:10px;">
+                            <button type="button" class="btn"
+                                onclick="closeModal('edit');location.reload();"
+                                style="background:var(--border);color:var(--text);">
+                                I Acknowledge &amp; Close
+                            </button>
+                            <a href="/pages/payment_form.php?rx=${rxId}"
+                               class="btn btn-primary" style="flex:1;text-align:center;">
+                                I Acknowledge &amp; Proceed to Payment &rarr;
+                            </a>
+                        </div>
+                    </div>`;
+            } else {
+                // No violations — normal close and reload
+                showToast('edit', data.message, 'success');
+                setTimeout(() => { closeModal('edit'); location.reload(); }, 1200);
+            }
+        } else {
+            showToast('edit', data.message, 'error');
+            btn.disabled = false; btn.textContent = 'Save Changes';
+        }
+    } catch {
+        showToast('edit', 'Unexpected error. Please try again.', 'error');
+        btn.disabled = false; btn.textContent = 'Save Changes';
+    }
+});
+
+// ── Prescription image request: Create Prescription ─────
+document.querySelectorAll('.btn-create-rx').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const customerId  = btn.dataset.customerId;
+        const requestId   = btn.dataset.requestId;
+        const card        = btn.closest('.rx-request-card');
+
+        btn.disabled = true; btn.textContent = 'Opening...';
+
+        // Mark the request as reviewed in the DB
+        const fd = new FormData();
+        fd.append('request_id', requestId);
+        fd.append('status', 'reviewed');
+        await fetch('/actions/update_prescription_request.php', { method: 'POST', body: fd });
+
+        // Remove the card from the panel
+        if (card) {
+            card.style.transition = 'opacity .3s';
+            card.style.opacity    = '0';
+            setTimeout(() => {
+                card.remove();
+                // Hide the whole panel if no cards remain
+                const remaining = document.querySelectorAll('.rx-request-card');
+                if (remaining.length === 0) {
+                    const panel = document.querySelector('[data-panel="rx-requests"]');
+                    if (panel) panel.style.display = 'none';
+                }
+            }, 300);
+        }
+
+        // Open the add prescription modal with the customer pre-selected
+        openModal('add');
+        const sel = document.getElementById('add_customer');
+        sel.value = customerId;
+        sel.dispatchEvent(new Event('change')); // triggers allergy box
+    });
+});
+
+// ── Prescription image request: Mark Reviewed ────────────
+document.querySelectorAll('.btn-mark-reviewed').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        btn.disabled = true; btn.textContent = '...';
+        const fd = new FormData();
+        fd.append('request_id', btn.dataset.id);
+        fd.append('status', 'reviewed');
+        try {
+            const res  = await fetch('/actions/update_prescription_request.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.success) {
+                const card = btn.closest('.rx-request-card');
+                if (card) {
+                    card.style.transition = 'opacity .3s';
+                    card.style.opacity    = '0';
+                    setTimeout(() => {
+                        card.remove();
+                        const remaining = document.querySelectorAll('.rx-request-card');
+                        if (remaining.length === 0) {
+                            const panel = document.querySelector('[data-panel="rx-requests"]');
+                            if (panel) panel.style.display = 'none';
+                        }
+                    }, 300);
+                }
+            } else {
+                btn.disabled = false; btn.textContent = '✓ Mark Reviewed';
+            }
+        } catch {
+            btn.disabled = false; btn.textContent = '✓ Mark Reviewed';
+        }
+    });
+});
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

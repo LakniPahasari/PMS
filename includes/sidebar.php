@@ -5,17 +5,42 @@ $role = $user['role'];
 // Current page for active link highlighting
 $current = basename($_SERVER['PHP_SELF']);
 
-// All roles see the full nav (role segregation will be added later)
-$links = [
-    ['href' => '/pages/dashboard.php',    'icon' => '🏠', 'label' => 'Dashboard'],
-    ['href' => '/pages/customers.php',    'icon' => '👤', 'label' => 'Customers'],
-    ['href' => '/pages/prescriptions.php','icon' => '📋', 'label' => 'Prescriptions'],
-    ['href' => '/pages/stock.php',        'icon' => '💊', 'label' => 'Medicine Stock'],
-    ['href' => '/pages/payments.php',     'icon' => '💳', 'label' => 'Payments'],
-    ['href' => '/pages/users.php',        'icon' => '👥', 'label' => 'System Users'],
-    ['href' => '/pages/audit.php',        'icon' => '📁', 'label' => 'Audit Log'],
-    ['href' => '/pages/alerts.php',       'icon' => '🔔', 'label' => 'Alerts'],
+$nav = [
+    'admin' => [
+        ['href' => '/pages/dashboard.php',    'icon' => '🏠', 'label' => 'Dashboard'],
+        ['href' => '/pages/customers.php',    'icon' => '👤', 'label' => 'Customers'],
+        ['href' => '/pages/prescriptions.php','icon' => '📋', 'label' => 'Prescriptions'],
+        ['href' => '/pages/stock.php',        'icon' => '💊', 'label' => 'Medicine Stock'],
+        ['href' => '/pages/payments.php',     'icon' => '💳', 'label' => 'Payments'],
+        ['href' => '/pages/reports.php',      'icon' => '📊', 'label' => 'Reports'],
+        ['href' => '/pages/rules.php',        'icon' => '🛡', 'label' => 'Detection Rules'],
+        ['href' => '/pages/users.php',        'icon' => '👥', 'label' => 'System Users'],
+        ['href' => '/pages/audit.php',        'icon' => '📁', 'label' => 'Audit Log'],
+        ['href' => '/pages/alerts.php',       'icon' => '🔔', 'label' => 'Alerts'],
+    ],
+    'pharmacist' => [
+        ['href' => '/pages/dashboard.php',    'icon' => '🏠', 'label' => 'Dashboard'],
+        ['href' => '/pages/customers.php',    'icon' => '👤', 'label' => 'Customers'],
+        ['href' => '/pages/prescriptions.php','icon' => '📋', 'label' => 'Prescriptions'],
+        ['href' => '/pages/stock.php',        'icon' => '💊', 'label' => 'Medicine Stock'],
+        ['href' => '/pages/payments.php',     'icon' => '💳', 'label' => 'Payments'],
+        ['href' => '/pages/rules.php',        'icon' => '🛡', 'label' => 'Detection Rules'],
+        ['href' => '/pages/alerts.php',       'icon' => '🔔', 'label' => 'Alerts'],
+    ],
+    'store_manager' => [
+        ['href' => '/pages/dashboard.php',    'icon' => '🏠', 'label' => 'Dashboard'],
+        ['href' => '/pages/customers.php',    'icon' => '👤', 'label' => 'Customers'],
+        ['href' => '/pages/prescriptions.php','icon' => '📋', 'label' => 'Prescriptions'],
+        ['href' => '/pages/stock.php',        'icon' => '💊', 'label' => 'Medicine Stock'],
+        ['href' => '/pages/payments.php',     'icon' => '💳', 'label' => 'Payments'],
+        ['href' => '/pages/reports.php',      'icon' => '📊', 'label' => 'Reports'],
+        ['href' => '/pages/rules.php',        'icon' => '🛡', 'label' => 'Detection Rules'],
+        ['href' => '/pages/audit.php',        'icon' => '📁', 'label' => 'Audit Log'],
+        ['href' => '/pages/alerts.php',       'icon' => '🔔', 'label' => 'Alerts'],
+    ],
 ];
+
+$links = $nav[$role] ?? $nav['pharmacist'];
 ?>
 
 <aside class="sidebar" id="sidebar">

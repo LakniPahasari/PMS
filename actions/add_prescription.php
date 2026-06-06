@@ -73,7 +73,7 @@ try {
 
     // Verify each medicine
     $medStmt = $db->prepare("
-        SELECT stock_id, medication_name, quantity AS stock_qty, requires_id_check, expiry_date
+        SELECT stock_id, medication_name, category, quantity AS stock_qty, requires_id_check, expiry_date
         FROM MEDICINE_STOCK WHERE stock_id = ? AND is_active = 1 LIMIT 1
     ");
     $resolvedItems = [];
@@ -97,11 +97,12 @@ try {
         if ($med['requires_id_check']) $needsIdCheck = true;
 
         $resolvedItems[] = [
-            'stock_id'        => $item['stock_id'],
-            'prescribed_qty'  => $item['prescribed_qty'],
-            'dosage'          => $item['dosage'],
-            'stock_qty'       => (int)$med['stock_qty'],
-            'medication_name' => $med['medication_name'],
+            'stock_id'          => $item['stock_id'],
+            'prescribed_qty'    => $item['prescribed_qty'],
+            'dosage'            => $item['dosage'],
+            'stock_qty'         => (int)$med['stock_qty'],
+            'medication_name'   => $med['medication_name'],
+            'category'          => $med['category'] ?? '',
             'requires_id_check' => $med['requires_id_check'],
         ];
     }
@@ -153,7 +154,16 @@ try {
         VALUES (?, 'prescription_created', 'PRESCRIPTION', ?, NOW())
     ")->execute([$user['id'], $prescriptionId]);
 
-    echo json_encode(['success' => true, 'message' => "Prescription for {$customer['name']} created successfully.", 'prescription_id' => (int)$prescriptionId]);
+    // Run detection rules and capture any violations to surface in the UI
+    require_once __DIR__ . '/../includes/rule_engine.php';
+    $violations = checkDispensingRules($db, (int)$prescriptionId, $customerId, (int)$user['id'], $resolvedItems, 'create');
+
+    echo json_encode([
+        'success'          => true,
+        'message'          => "Prescription for {$customer['name']} created successfully.",
+        'prescription_id'  => (int)$prescriptionId,
+        'rule_violations'  => $violations,
+    ]);
 
 } catch (PDOException $e) {
     if (isset($db) && $db->inTransaction()) $db->rollBack();

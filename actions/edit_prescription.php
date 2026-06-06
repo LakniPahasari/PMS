@@ -71,7 +71,7 @@ try {
         }
 
         $medStmt = $db->prepare("
-            SELECT stock_id, medication_name, quantity AS stock_qty, requires_id_check, expiry_date
+            SELECT stock_id, medication_name, category, quantity AS stock_qty, requires_id_check, expiry_date
             FROM MEDICINE_STOCK WHERE stock_id = ? AND is_active = 1 LIMIT 1
         ");
         foreach ($items as $item) {
@@ -85,6 +85,7 @@ try {
             $resolvedItems[] = array_merge($item, [
                 'stock_qty'         => (int)$med['stock_qty'],
                 'medication_name'   => $med['medication_name'],
+                'category'          => $med['category'] ?? '',
                 'requires_id_check' => $med['requires_id_check'],
             ]);
         }
@@ -203,7 +204,35 @@ try {
         VALUES (?, 'prescription_updated', 'PRESCRIPTION', ?, ?, NOW())
     ")->execute([$user['id'], $id, json_encode(['new_status' => $status, 'old_status' => $oldStatus])]);
 
-    echo json_encode(['success' => true, 'message' => 'Prescription updated successfully.']);
+    // Run detection rules on first processed transition (full rule set)
+    $violations = [];
+    if ($status === 'processed' && $oldStatus !== 'processed') {
+        require_once __DIR__ . '/../includes/rule_engine.php';
+        $rxRow = $db->prepare("SELECT customer_id FROM PRESCRIPTION WHERE prescription_id = ? LIMIT 1");
+        $rxRow->execute([$id]);
+        $customerId = (int)($rxRow->fetchColumn() ?: 0);
+
+        $ruleItems = !empty($resolvedItems) ? $resolvedItems : [];
+        if (empty($ruleItems)) {
+            $ri = $db->prepare("
+                SELECT pi.stock_id, pi.quantity AS prescribed_qty, pi.dosage,
+                       m.medication_name, m.category
+                FROM PRESCRIPTION_ITEM pi
+                JOIN MEDICINE_STOCK m ON m.stock_id = pi.stock_id
+                WHERE pi.prescription_id = ?
+            ");
+            $ri->execute([$id]);
+            $ruleItems = $ri->fetchAll();
+        }
+        $violations = checkDispensingRules($db, $id, $customerId, (int)$user['id'], $ruleItems, 'process');
+    }
+
+    echo json_encode([
+        'success'         => true,
+        'message'         => 'Prescription updated successfully.',
+        'prescription_id' => $id,
+        'rule_violations' => $violations,
+    ]);
 
 } catch (PDOException $e) {
     if (isset($db) && $db->inTransaction()) $db->rollBack();

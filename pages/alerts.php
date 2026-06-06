@@ -22,6 +22,7 @@ $typeStyles = [
     'low_stock'       => ['bg' => '#fef3c7', 'text' => '#92400e', 'label' => 'Low Stock'],
     'age_restriction' => ['bg' => '#fee2e2', 'text' => '#991b1b', 'label' => 'Age Restriction'],
     'expiry'          => ['bg' => '#fde68a', 'text' => '#78350f', 'label' => 'Expiry Warning'],
+    'rule_violation'  => ['bg' => '#ede9fe', 'text' => '#5b21b6', 'label' => 'Rule Violation'],
 ];
 
 $pageTitle = 'Alerts';
